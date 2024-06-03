@@ -1,6 +1,7 @@
 package io.kestra.core.services;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import io.kestra.core.models.Plugin;
@@ -18,7 +19,6 @@ import io.kestra.core.serializers.YamlFlowParser;
 import io.kestra.core.utils.MapUtils;
 import io.micronaut.core.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
-import org.checkerframework.checker.units.qual.N;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -33,9 +33,7 @@ import jakarta.validation.ConstraintViolationException;
 @Singleton
 @Slf4j
 public class PluginDefaultService {
-    private static final ObjectMapper NON_DEFAULT_OBJECT_MAPPER = JacksonMapper.ofYaml()
-        .copy()
-        .setSerializationInclusion(JsonInclude.Include.NON_DEFAULT);
+    private static final ObjectMapper OBJECT_MAPPER = JacksonMapper.ofYaml();
 
     @Nullable
     @Inject
@@ -89,7 +87,7 @@ public class PluginDefaultService {
             .collect(Collectors.groupingBy(PluginDefault::getType));
     }
 
-    public Flow injectDefaults(Flow flow, Execution execution) {
+    public Flow injectDefaults(FlowWithSource flow, Execution execution) {
         try {
             return this.injectDefaults(flow);
         } catch (Exception e) {
@@ -113,12 +111,13 @@ public class PluginDefaultService {
     }
 
     @SuppressWarnings("unchecked")
+    @Deprecated
     public Flow injectDefaults(Flow flow) throws ConstraintViolationException {
         if (flow instanceof FlowWithSource) {
             flow = ((FlowWithSource) flow).toFlow();
         }
 
-        Map<String, Object> flowAsMap = NON_DEFAULT_OBJECT_MAPPER.convertValue(flow, JacksonMapper.MAP_TYPE_REFERENCE);
+        Map<String, Object> flowAsMap = OBJECT_MAPPER.convertValue(flow, JacksonMapper.MAP_TYPE_REFERENCE);
 
         List<PluginDefault> allDefaults = mergeAllDefaults(flow);
         addAliases(allDefaults);
@@ -151,6 +150,47 @@ public class PluginDefaultService {
         }
 
         return yamlFlowParser.parse(flowAsMap, Flow.class, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Flow injectDefaults(FlowWithSource flow) throws ConstraintViolationException {
+        try {
+            Map<String, Object> flowAsMap = OBJECT_MAPPER.readValue(flow.getSource(), JacksonMapper.MAP_TYPE_REFERENCE);
+
+            List<PluginDefault> allDefaults = mergeAllDefaults(flow);
+            addAliases(allDefaults);
+            Map<Boolean, List<PluginDefault>> allDefaultsGroup = allDefaults
+                .stream()
+                .collect(Collectors.groupingBy(PluginDefault::isForced, Collectors.toList()));
+
+            // non forced
+            Map<String, List<PluginDefault>> defaults = pluginDefaultsToMap(allDefaultsGroup.getOrDefault(false, Collections.emptyList()));
+
+            // forced plugin default need to be reverse, lower win
+            Map<String, List<PluginDefault>> forced = pluginDefaultsToMap(Lists.reverse(allDefaultsGroup.getOrDefault(true, Collections.emptyList())));
+
+            Object pluginDefaults = flowAsMap.get("pluginDefaults");
+            if (pluginDefaults != null) {
+                flowAsMap.remove("pluginDefaults");
+            }
+
+            // we apply default and overwrite with forced
+            if (!defaults.isEmpty()) {
+                flowAsMap = (Map<String, Object>) recursiveDefaults(flowAsMap, defaults);
+            }
+
+            if (!forced.isEmpty()) {
+                flowAsMap = (Map<String, Object>) recursiveDefaults(flowAsMap, forced);
+            }
+
+            if (pluginDefaults != null) {
+                flowAsMap.put("pluginDefaults", pluginDefaults);
+            }
+
+            return yamlFlowParser.parse(flowAsMap, Flow.class, false);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void addAliases(List<PluginDefault> allDefaults) {

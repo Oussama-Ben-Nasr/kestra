@@ -64,7 +64,7 @@ public abstract class AbstractScheduler implements Scheduler, Service {
     private final QueueInterface<WorkerJob> workerTaskQueue;
     private final WorkerTriggerResultQueueInterface workerTriggerResultQueue;
     private final QueueInterface<ExecutionKilled> executionKilledQueue;
-    protected final FlowListenersInterface flowListeners;
+    private final FlowListenersInterface flowListeners;
     private final RunContextFactory runContextFactory;
     private final RunContextInitializer runContextInitializer;
     private final MetricRegistry metricRegistry;

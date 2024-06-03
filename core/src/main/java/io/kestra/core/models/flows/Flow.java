@@ -340,7 +340,7 @@ public class Flow extends AbstractFlow {
             ));
         }
 
-        if (violations.size() > 0) {
+        if (!violations.isEmpty()) {
             return Optional.of(new ConstraintViolationException(violations));
         } else {
             return Optional.empty();
@@ -356,5 +356,9 @@ public class Flow extends AbstractFlow {
             .revision(this.revision + 1)
             .deleted(true)
             .build();
+    }
+
+    public FlowWithSource withSource(String source) {
+        return FlowWithSource.of(this, source);
     }
 }
