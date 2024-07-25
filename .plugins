@@ -34,7 +34,7 @@
 #io.kestra.plugin:plugin-jdbc-as400:LATEST
 #io.kestra.plugin:plugin-jdbc-clickhouse:LATEST
 #io.kestra.plugin:plugin-jdbc-db2:LATEST
-#io.kestra.plugin:plugin-jdbc-duckdb:LATEST
+io.kestra.plugin:plugin-jdbc-duckdb:LATEST
 #io.kestra.plugin:plugin-jdbc-druid:LATEST
 #io.kestra.plugin:plugin-jdbc-mysql:LATEST
 #io.kestra.plugin:plugin-jdbc-oracle:LATEST
